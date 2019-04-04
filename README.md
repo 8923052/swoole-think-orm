@@ -4,6 +4,32 @@
 # 安装：
 composer require prince/swoole-think-orm
 
+# 使用：和think-php orm使用一致，详见文档
+Db类用法：
+~~~php
+use think\Db;
+// 数据库配置信息设置（全局有效）
+Db::setConfig(['数据库配置参数（数组）']);
+// 进行CURD操作
+Db::table('user')
+	->data(['name'=>'thinkphp','email'=>'thinkphp@qq.com'])
+	->insert();	
+Db::table('user')->find();
+Db::table('user')
+	->where('id','>',10)
+	->order('id','desc')
+	->limit(10)
+	->select();
+Db::table('user')
+	->where('id',10)
+	->update(['name'=>'test']);	
+Db::table('user')
+	->where('id',10)
+	->delete();
+~~~
+
+其它操作参考TP5.1的完全开发手册[数据库](https://www.kancloud.cn/manual/thinkphp5_1/353998)章节
+
 # 特性：
 1、支持swoole协程环境。
 
