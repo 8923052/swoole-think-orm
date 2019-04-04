@@ -4,8 +4,11 @@
 # 测试环境：
 
 建议使用docker环境，需要安装docker,docker-compose
+
 项目内有docker-compose.yml
+
 运行docker-compose up -d
+
 然后进入容器docker exec -it swoole bash
 
 # 安装：
