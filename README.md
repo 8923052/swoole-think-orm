@@ -28,7 +28,7 @@ Db::table('user')
 	->delete();
 ~~~
 
-其它操作参考TP5.1的完全开发手册[数据库](https://www.kancloud.cn/manual/thinkphp5_1/353998)章节
+其它操作参考TP5.1的完全开发手册[数据库](https://www.kancloud.cn/manual/thinkphp5_1/353998?_blank)章节
 
 # 特性：
 1、支持swoole协程环境。
