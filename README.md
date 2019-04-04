@@ -1,6 +1,9 @@
 # swoole-think-orm
 适应swoole协程环境运行的think-orm
 
+# 安装：
+composer require prince/swoole-think-orm
+
 # 特性：
 1、支持swoole协程环境。
 
