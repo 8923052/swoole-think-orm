@@ -551,7 +551,7 @@ abstract class Connection
 				//连接池必须用短连接。
 				$params [\PDO::ATTR_PERSISTENT] = false;
 				//SQLSTATE[42000]: Syntax error or access violation: 1461 Can't create more than max_prepared_stmt_count statements (current value: 16382)
-				//$params [\PDO::ATTR_EMULATE_PREPARES] = true;
+				$params [\PDO::ATTR_EMULATE_PREPARES] = true;
 				//$params [\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
 				return new \PDO($config ['dsn'], $config ['username'], $config ['password'], $params);
 			}, $this->config);
