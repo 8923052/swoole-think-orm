@@ -98,7 +98,6 @@ class Pool {
 	 */
 	protected static function createClient(callable $callback, array $config) {
 		$id = self::id($config);
-		self::$call_back [$id] = $callback;
 		for($i = 1; $i <= self::$max_size [$id]; $i ++) {
 			try {
 				$connection = $callback();
@@ -121,7 +120,7 @@ class Pool {
 	/**
 	 */
 	protected static function exceptions($msg) {
-		return (bool)preg_match('/Unknown/isU', $msg);
+		return (bool)preg_match('/Unknown|Access/isU', $msg);
 	}
 	
 	/**
@@ -130,11 +129,9 @@ class Pool {
 	 * @throws \Exception
 	 */
 	protected static function exception(\Exception $e) {
-		if(self::exceptions($e->getMessage())) {
-			self::console("【 初始化 】创建连接异常" . $e->getMessage() . ",不再创建连接");
-			throw new \Exception($e->getTraceAsString());
-			return;
-		}
+		self::console("【 初始化 】创建连接异常" . $e->getMessage() . ",不再创建连接");
+		throw new \Exception($e->getTraceAsString());
+		return;
 	}
 	
 	/**
