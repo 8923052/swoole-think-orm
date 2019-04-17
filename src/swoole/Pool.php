@@ -51,7 +51,7 @@ class Pool {
 				break;
 			//默认连接池容量
 			default :
-				$size = 8;
+				$size = 5;
 				break;
 		}
 		self::$max_size [$id] = $size;
