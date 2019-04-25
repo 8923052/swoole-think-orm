@@ -107,9 +107,12 @@ class Db
      * @return Connection
      */
     public function instance(array $config = [], $name = false)
-    {
+    {// 利用cid标记获取到原来的connection
+    	$cid = \Swoole\Coroutine::getCid();
+    	//$id = md5(serialize($config) . $cid);
+    	
         if (false === $name) {
-            $name = md5(serialize($config));
+        	$name = md5(serialize($config). $cid);
         }
 
         if (true === $name || !isset($this->instance[$name])) {
@@ -121,8 +124,8 @@ class Db
             if (true === $name) {
                 $name = md5(serialize($config));
             }
-
-            $this->instance[$name] = App::factory($config['type'], '\\think\\db\\connector\\', $config);
+            //$class = false !== strpos($config['type'], '\\') ? $config['type'] : '\\think\\db\\connector\\' . ucwords($config['type']);
+            return App::factory($config['type'], '\\think\\db\\connector\\', $config);
         }
 
         return $this->instance[$name];

@@ -237,7 +237,7 @@ class Container implements ContainerInterface, ArrayAccess, IteratorAggregate, C
      * @param bool   $newInstance 是否每次创建新的实例
      * @return mixed
      */
-    public function make(string $abstract, array $vars = [], bool $newInstance = false)
+    public function make(string $abstract, array $vars = [], bool $newInstance = true)
     {
         if (isset($this->instances[$abstract]) && !$newInstance) {
             return $this->instances[$abstract];

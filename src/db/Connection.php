@@ -598,12 +598,25 @@ abstract class Connection
 
             if ($config['debug']) {
                 $startTime             = microtime(true);
-                $this->links[$linkNum] = $this->createPdo($config['dsn'], $config['username'], $config['password'], $params);
+
+                //$this->links[$linkNum] = $this->createPdo($config['dsn'], $config['username'], $config['password'], $params);
                 // 记录数据库连接信息
                 $this->log('[ DB ] CONNECT:[ UseTime:' . number_format(microtime(true) - $startTime, 6) . 's ] ' . $config['dsn']);
             } else {
-                $this->links[$linkNum] = $this->createPdo($config['dsn'], $config['username'], $config['password'], $params);
+                //$this->links[$linkNum] = $this->createPdo($config['dsn'], $config['username'], $config['password'], $params);
             }
+            //改动1,从连接池直接获取PDO对象，注意处理连接池，阻塞调用，一直等待拿到为止。
+            // 初始化连接池
+            \think\swoole\Pool::init(function () use ($config, $params) {
+            	//连接池必须用短连接。
+            	$params [\PDO::ATTR_PERSISTENT] = false;
+            	//SQLSTATE[42000]: Syntax error or access violation: 1461 Can't create more than max_prepared_stmt_count statements (current value: 16382)
+            	$params [\PDO::ATTR_EMULATE_PREPARES] = true;
+            	//$params [\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
+            	return new \PDO($config['dsn'], $config ['username'], $config ['password'], $params);
+            }, $this->config);
+            	// 需要注意，初始化和get连接时需要使用同样的config。
+            return \think\swoole\Pool::get($this->config);
 
             return $this->links[$linkNum];
         } catch (\PDOException $e) {
@@ -625,7 +638,20 @@ abstract class Connection
      * @return PDO
      */
     protected function createPdo($dsn, $username, $password, $params)
-    {
+    {//改动1,从连接池直接获取PDO对象，注意处理连接池，阻塞调用，一直等待拿到为止。
+    	//$this->links[$linkNum] = new PDO($config['dsn'], $config['username'], $config['password'], $params);
+    	// 初始化连接池
+    	\think\swoole\Pool::init(function () use ($dsn, $username, $password, $params) {
+    		//连接池必须用短连接。
+    		$params [\PDO::ATTR_PERSISTENT] = false;
+    		//SQLSTATE[42000]: Syntax error or access violation: 1461 Can't create more than max_prepared_stmt_count statements (current value: 16382)
+    		$params [\PDO::ATTR_EMULATE_PREPARES] = true;
+    		//$params [\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
+    		//return new \PDO($dsn, $config ['username'], $config ['password'], $params);
+    		return new PDO($dsn, $username, $password, $params);
+    	}, $this->config);
+    		// 需要注意，初始化和get连接时需要使用同样的config。
+    		return \think\swoole\Pool::get($this->config);
         return new PDO($dsn, $username, $password, $params);
     }
 
@@ -666,8 +692,17 @@ abstract class Connection
     {
         $this->queryPDOStatement($query, $sql, $bind);
 
+        // 结束标志
+        $end = false;
         // 返回结果集
-        while ($result = $this->PDOStatement->fetch($this->fetchType)) {
+        while ($result = $this->PDOStatement->fetch($this->fetchType) or $end === false) {
+        	//fetch结束后，继续fetch一次会返回false
+        	if($result === false) {
+        		$end = true;
+        		//归还连接，终止执行
+        		$this->returnConnection();
+        		return;
+        	}
             if ($model) {
                 yield $model->newInstance($result, $condition)->setQuery($query);
             } else {
@@ -780,7 +815,16 @@ abstract class Connection
 
             return $this->PDOStatement;
         } catch (\Throwable | \Exception $e) {
+        	if($this->transTimes == 0) {
+        		// 1.非事务环境，异常必须释放连接，否则占用资源
+        		$this->close();
+        		// 2.异常情况，如连接断掉，sql错误等，已经无法自动归还连接，所以必须给连接池补充连接，以便连接池复原。
+        		\think\swoole\Pool::add($this->config);
+        	}
+        	
             if ($this->isBreak($e)) {
+            	// 2.异常情况，如连接断掉，sql错误等，已经无法自动归还连接，所以必须给连接池补充连接，以便连接池复原。
+            	\think\swoole\Pool::add($this->config);
                 return $this->close()->getPDOStatement($sql, $bind, $master, $procedure);
             }
 
@@ -975,10 +1019,13 @@ abstract class Connection
             $this->db->trigger('after_insert', $query);
 
             if ($getLastInsID) {
+            	//归还连接
+            	$this->returnConnection();
                 return $lastInsId;
             }
         }
-
+        //归还连接
+        $this->returnConnection();
         return $result;
     }
 
@@ -1019,13 +1066,16 @@ abstract class Connection
                 $this->rollback();
                 throw $e;
             }
-
+            //归还连接
+            $this->returnConnection();
             return $count;
         }
 
         $sql = $this->builder->insertAll($query, $dataSet);
-
-        return $this->execute($query, $sql, $query->getBind());
+        $count = $this->execute($query, $sql, $query->getBind());
+        //归还连接
+        $this->returnConnection();
+        return $count;
     }
 
     /**
@@ -1042,7 +1092,10 @@ abstract class Connection
         // 分析查询表达式
         $sql = $this->builder->selectInsert($query, $fields, $table);
 
-        return $this->execute($query, $sql, $query->getBind());
+        $count = $this->execute($query, $sql, $query->getBind());
+        //归还连接
+        $this->returnConnection();
+        return $count;
     }
 
     /**
@@ -1079,7 +1132,8 @@ abstract class Connection
         if ($result) {
             $this->db->trigger('after_update', $query);
         }
-
+        //归还连接
+        $this->returnConnection();
         return $result;
     }
 
@@ -1118,7 +1172,8 @@ abstract class Connection
         if ($result) {
             $this->db->trigger('after_delete', $query);
         }
-
+        //归还连接
+        $this->returnConnection();
         return $result;
     }
 
@@ -1168,7 +1223,8 @@ abstract class Connection
             $cacheItem->set($result);
             $this->cacheData($cacheItem);
         }
-
+        //归还连接
+        $this->returnConnection();
         return false !== $result ? $result : $default;
     }
 
@@ -1264,7 +1320,8 @@ abstract class Connection
             $cacheItem->set($result);
             $this->cacheData($cacheItem);
         }
-
+        //归还连接
+        $this->returnConnection();
         return $result;
     }
 
@@ -1385,7 +1442,8 @@ abstract class Connection
         $result = $this->PDOStatement->fetchAll($this->fetchType);
 
         $this->numRows = count($result);
-
+        //归还连接
+        $this->returnConnection();
         return $result;
     }
 
@@ -1482,6 +1540,8 @@ abstract class Connection
         }
 
         --$this->transTimes;
+        //归还连接
+        $this->returnConnection();
     }
 
     /**
@@ -1503,6 +1563,8 @@ abstract class Connection
         }
 
         $this->transTimes = max(0, $this->transTimes - 1);
+        //事务回滚，归还连接
+        $this->returnConnection();
     }
 
     /**
@@ -1560,7 +1622,8 @@ abstract class Connection
             $this->rollback();
             throw $e;
         }
-
+        //归还连接
+        $this->returnConnection();
         return true;
     }
 
@@ -1907,5 +1970,20 @@ abstract class Connection
         }
 
         return false;
+    }
+    
+    /**
+     * 归还连接
+     */
+    protected function returnConnection() {
+    	// 事务开启状态,不归还连接,不释放连接
+    	if($this->transTimes > 0) {
+    		return;
+    	}
+    	// 检测是否为pdo实例，特殊情况下在还未获取连接前出现异常，此时没有连接归还
+    	if($this->linkID instanceof \PDO) {
+    		\think\swoole\Pool::put($this->linkID, $this->config);
+    	}
+    	$this->close();
     }
 }
