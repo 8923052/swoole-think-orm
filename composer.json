@@ -1,0 +1,28 @@
+{
+    "name": "prince/swoole-think-orm",
+    "description": "适应swoole协程环境运行的think-orm",
+    "keywords": [
+        "orm",
+        "database"
+    ],      
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "prince",
+            "email": "8923052@qq.com"
+        }
+    ],
+    "require": {
+	   "php": ">=7.1.0",
+        "psr/cache": "~1.0",
+        "psr/simple-cache": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "think\\": "src"
+        },
+        "files": [
+            
+        ]
+    }
+}
