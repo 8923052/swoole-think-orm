@@ -125,7 +125,7 @@ class Db
                 $name = md5(serialize($config));
             }
             //$class = false !== strpos($config['type'], '\\') ? $config['type'] : '\\think\\db\\connector\\' . ucwords($config['type']);
-            return App::factory($config['type'], '\\think\\db\\connector\\', $config);
+            $this->instance[$name] = App::factory($config['type'], '\\think\\db\\connector\\', $config);
         }
 
         return $this->instance[$name];

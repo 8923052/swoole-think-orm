@@ -1464,7 +1464,8 @@ abstract class Connection
         } while ($this->PDOStatement->nextRowset());
 
         $this->numRows = count($item);
-
+        //归还连接
+        $this->returnConnection();
         return $item;
     }
 
@@ -1488,6 +1489,8 @@ abstract class Connection
             }
 
             $this->commit();
+            //归还连接
+            $this->returnConnection();
             return $result;
         } catch (\Exception | \Throwable $e) {
             $this->rollback();

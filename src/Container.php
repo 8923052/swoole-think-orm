@@ -237,7 +237,7 @@ class Container implements ContainerInterface, ArrayAccess, IteratorAggregate, C
      * @param bool   $newInstance 是否每次创建新的实例
      * @return mixed
      */
-    public function make(string $abstract, array $vars = [], bool $newInstance = true)
+    public function make(string $abstract, array $vars = [], bool $newInstance = false)
     {
         if (isset($this->instances[$abstract]) && !$newInstance) {
             return $this->instances[$abstract];
@@ -393,8 +393,8 @@ class Container implements ContainerInterface, ArrayAccess, IteratorAggregate, C
             $args = $constructor ? $this->bindParams($constructor, $vars) : [];
 
             return $reflect->newInstanceArgs($args);
-        } catch (ReflectionException $e) {var_dump($e->getMessage());
-            throw new ClassNotFoundException('class not exists: ' . $class, $class);
+        } catch (ReflectionException $e) {
+        throw new ClassNotFoundException($e->getMessage().'. class not exists: ' . $class, $class);
         }
     }
 
