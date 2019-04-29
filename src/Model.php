@@ -16,6 +16,7 @@ use ArrayAccess;
 use Closure;
 use JsonSerializable;
 use think\db\Query;
+use think\facade\Db;
 
 /**
  * Class Model
@@ -78,6 +79,12 @@ abstract class Model implements JsonSerializable, ArrayAccess
      * @var bool
      */
     private $replace = false;
+
+    /**
+     * 数据表后缀
+     * @var string
+     */
+    protected $suffix;
 
     /**
      * 更新条件
@@ -158,51 +165,6 @@ abstract class Model implements JsonSerializable, ArrayAccess
     protected $db;
 
     /**
-     * Event对象
-     * @var Event
-     */
-    protected $event;
-
-    /**
-     * 服务注入
-     * @var Closure
-     */
-    protected static $maker;
-
-    /**
-     * 设置服务注入
-     * @access public
-     * @param Closure $maker
-     * @return void
-     */
-    public static function maker(Closure $maker)
-    {
-        static::$maker = $maker;
-    }
-
-    /**
-     * 设置Db对象
-     * @access public
-     * @param Db $db Db对象
-     * @return void
-     */
-    public function setDb(Db $db)
-    {
-        $this->db = $db;
-    }
-
-    /**
-     * 设置Event对象
-     * @access public
-     * @param Event $event Event对象
-     * @return void
-     */
-    public function setEvent(Event $event)
-    {
-        $this->event = $event;
-    }
-
-    /**
      * 设置Connection信息
      * @access public
      * @param mixed $connection 数据库配置
@@ -248,10 +210,6 @@ abstract class Model implements JsonSerializable, ArrayAccess
             // 当前模型名
             $name       = str_replace('\\', '/', static::class);
             $this->name = basename($name);
-        }
-
-        if (static::$maker) {
-            call_user_func(static::$maker, $this);
         }
 
         // 执行初始化操作
@@ -313,6 +271,28 @@ abstract class Model implements JsonSerializable, ArrayAccess
     }
 
     /**
+     * 设置当前模型数据表的后缀
+     * @access public
+     * @param string $suffix 数据表后缀
+     * @return $this
+     */
+    public function setSuffix(string $suffix)
+    {
+        $this->suffix = $suffix;
+        return $this;
+    }
+
+    /**
+     * 获取当前模型的数据表后缀
+     * @access public
+     * @return string
+     */
+    public function getSuffix(): string
+    {
+        return $this->suffix ?: '';
+    }
+
+    /**
      * 获取当前模型的数据库查询对象
      * @access public
      * @param array|false $scope 使用的全局查询范围
@@ -324,17 +304,17 @@ abstract class Model implements JsonSerializable, ArrayAccess
         if ($this->queryInstance) {
             $query = $this->queryInstance->removeOption();
         } else {
-            $query = $this->db->buildQuery($this->connection)
-                ->name($this->name)
+            $query = Db::buildQuery($this->connection)
+                ->name($this->name . $this->suffix)
                 ->pk($this->pk);
         }
 
         $query->model($this)
             ->json($this->json, $this->jsonAssoc)
-            ->setFieldType($this->schema);
+            ->setFieldType(array_merge($this->schema, $this->jsonType));
 
         if (!empty($this->table)) {
-            $query->table($this->table);
+            $query->table($this->table . $this->suffix);
         }
 
         // 软删除
@@ -363,7 +343,7 @@ abstract class Model implements JsonSerializable, ArrayAccess
         if (!isset(static::$initialized[static::class])) {
             if ($this->observerClass) {
                 // 注册模型观察者
-                static::observe($this->observerClass);
+                $this->observe($this->observerClass);
             }
             static::$initialized[static::class] = true;
             static::init();
@@ -557,10 +537,10 @@ abstract class Model implements JsonSerializable, ArrayAccess
         // 检测字段
         if (empty($this->field)) {
             if (!empty($this->schema)) {
-                $this->field = array_keys($this->schema);
+                $this->field = array_keys(array_merge($this->schema, $this->jsonType));
             } else {
                 $query = $this->db();
-                $table = $this->table ?: $query->getTable();
+                $table = $this->table ? $this->table . $this->suffix : $query->getTable();
 
                 $this->field = $query->getConnection()->getTableFields($table);
             }
@@ -1022,6 +1002,20 @@ abstract class Model implements JsonSerializable, ArrayAccess
         $model = new static();
 
         return $model->db($scope);
+    }
+
+    /**
+     * 切换后缀进行查询
+     * @access public
+     * @param string $suffix 切换的表后缀
+     * @return Model
+     */
+    public static function change(string $suffix)
+    {
+        $model = new static();
+        $model->setSuffix($suffix);
+
+        return $model;
     }
 
     public function __call($method, $args)

@@ -13,8 +13,8 @@ declare (strict_types = 1);
 namespace think\model\concern;
 
 use InvalidArgumentException;
-use think\App;
 use think\db\Raw;
+use think\facade\Db;
 use think\model\Relation;
 
 /**
@@ -75,6 +75,12 @@ trait Attribute
      * @var array
      */
     protected $json = [];
+
+    /**
+     * JSON数据表字段类型
+     * @var array
+     */
+    protected $jsonType = [];
 
     /**
      * JSON数据取出是否需要转换为数组
@@ -179,7 +185,7 @@ trait Attribute
      */
     protected function getRealFieldName(string $name): string
     {
-        return $this->strict ? $name : App::parseName($name);
+        return $this->strict ? $name : Db::parseName($name);
     }
 
     /**
@@ -353,7 +359,7 @@ trait Attribute
             $value = $this->autoWriteTimestamp($name);
         } else {
             // 检测修改器
-            $method = 'set' . App::parseName($name, 1) . 'Attr';
+            $method = 'set' . Db::parseName($name, 1) . 'Attr';
 
             if (method_exists($this, $method)) {
                 $value = $this->$method($value, array_merge($this->data, $data));
@@ -473,7 +479,7 @@ trait Attribute
     {
         // 检测属性获取器
         $fieldName = $this->getRealFieldName($name);
-        $method    = 'get' . App::parseName($name, 1) . 'Attr';
+        $method    = 'get' . Db::parseName($name, 1) . 'Attr';
 
         if (isset($this->withAttr[$fieldName])) {
             if ($relation) {

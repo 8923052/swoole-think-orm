@@ -12,10 +12,10 @@
 namespace think\model\relation;
 
 use Closure;
-use think\App;
 use think\Collection;
 use think\db\Query;
 use think\Exception;
+use think\facade\Db;
 use think\Model;
 use think\model\Relation;
 
@@ -146,7 +146,7 @@ class HasManyThrough extends Relation
     {
         if (empty($this->baseQuery) && $this->parent->getData()) {
             $through      = $this->through;
-            $alias        = App::parseName(App::classBaseName($this->model));
+            $alias        = Db::parseName(Db::classBaseName($this->model));
             $throughTable = $through::getTable();
             $pk           = (new $through)->getPk();
             $throughKey   = $this->throughKey;

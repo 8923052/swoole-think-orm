@@ -13,7 +13,7 @@ declare (strict_types = 1);
 namespace think\model\relation;
 
 use Closure;
-use think\App;
+use think\facade\Db;
 use think\Model;
 
 /**
@@ -136,8 +136,8 @@ class BelongsTo extends OneToOne
     public function has(string $operator = '>=', int $count = 1, string $id = '*', string $joinType = ''): Query
     {
         $table      = $this->query->getTable();
-        $model      = App::classBaseName($this->parent);
-        $relation   = App::classBaseName($this->model);
+        $model      = Db::classBaseName($this->parent);
+        $relation   = Db::classBaseName($this->model);
         $localKey   = $this->localKey;
         $foreignKey = $this->foreignKey;
 
@@ -161,8 +161,8 @@ class BelongsTo extends OneToOne
     public function hasWhere($where = [], $fields = null, string $joinType = ''): Query
     {
         $table    = $this->query->getTable();
-        $model    = App::classBaseName($this->parent);
-        $relation = App::classBaseName($this->model);
+        $model    = Db::classBaseName($this->parent);
+        $relation = Db::classBaseName($this->model);
 
         if (is_array($where)) {
             $this->getQueryWhere($where, $relation);
@@ -207,7 +207,7 @@ class BelongsTo extends OneToOne
             ], $localKey, $relation, $subRelation, $closure);
 
             // 关联属性名
-            $attr = App::parseName($relation);
+            $attr = Db::parseName($relation);
 
             // 关联数据封装
             foreach ($resultSet as $result) {
@@ -265,7 +265,7 @@ class BelongsTo extends OneToOne
             $this->bindAttr($relationModel, $result);
         } else {
             // 设置关联属性
-            $result->setRelation(App::parseName($relation), $relationModel);
+            $result->setRelation(Db::parseName($relation), $relationModel);
         }
     }
 

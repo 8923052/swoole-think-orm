@@ -12,7 +12,9 @@ declare (strict_types = 1);
 
 namespace think;
 
+use Exception;
 use InvalidArgumentException;
+use think\Container;
 use think\db\Connection;
 use think\db\Query;
 use think\db\Raw;
@@ -38,16 +40,16 @@ class Db
     protected $instance = [];
 
     /**
-     * Event对象
-     * @var Event
-     */
-    protected $event;
-
-    /**
      * 数据库配置
      * @var array
      */
     protected $config = [];
+
+    /**
+     * Event
+     * @var array
+     */
+    protected $event = [];
 
     /**
      * SQL监听
@@ -71,19 +73,9 @@ class Db
         $this->config = $config;
     }
 
-    /**
-     * @param Event  $event
-     * @param Config $config
-     * @return Db
-     * @codeCoverageIgnore
-     */
-    public static function __make(Event $event, Config $config)
+    public function setConfig(array $config): void
     {
-        $db = new static($config->get('database'));
-
-        $db->setEvent($event);
-
-        return $db;
+        $this->config = array_merge($this->config, $config);
     }
 
     /**
@@ -107,12 +99,9 @@ class Db
      * @return Connection
      */
     public function instance(array $config = [], $name = false)
-    {// 利用cid标记获取到原来的connection
-    	$cid = \Swoole\Coroutine::getCid();
-    	//$id = md5(serialize($config) . $cid);
-    	
+    {
         if (false === $name) {
-        	$name = md5(serialize($config). $cid);
+            $name = md5(serialize($config));
         }
 
         if (true === $name || !isset($this->instance[$name])) {
@@ -124,11 +113,30 @@ class Db
             if (true === $name) {
                 $name = md5(serialize($config));
             }
-            //$class = false !== strpos($config['type'], '\\') ? $config['type'] : '\\think\\db\\connector\\' . ucwords($config['type']);
-            $this->instance[$name] = App::factory($config['type'], '\\think\\db\\connector\\', $config);
+
+            $this->instance[$name] = $this->factory($config['type'], '\\think\\db\\connector\\', $config);
         }
 
         return $this->instance[$name];
+    }
+
+    /**
+     * 创建工厂对象实例
+     * @access public
+     * @param string $name      工厂类名
+     * @param string $namespace 默认命名空间
+     * @param array  $args
+     * @return mixed
+     */
+    public function factory(string $name, string $namespace = '', ...$args)
+    {
+        $class = false !== strpos($name, '\\') ? $name : $namespace . ucwords($name);
+
+        if (class_exists($class)) {
+            return Container::getInstance()->invokeClass($class, $args);
+        }
+
+        throw new Exception('class not exists:' . $class);
     }
 
     /**
@@ -239,15 +247,6 @@ class Db
     }
 
     /**
-     * 设置Event对象
-     * @param Event $event
-     */
-    public function setEvent(Event $event)
-    {
-        $this->event = $event;
-    }
-
-    /**
      * 注册回调方法
      * @access public
      * @param string   $event    事件名
@@ -256,9 +255,7 @@ class Db
      */
     public function event(string $event, callable $callback): void
     {
-        if ($this->event) {
-            $this->event->listen('db.' . $event, $callback);
-        }
+        $this->event[$event] = $callback;
     }
 
     /**
@@ -271,8 +268,8 @@ class Db
      */
     public function trigger(string $event, $params = null, bool $once = false)
     {
-        if ($this->event) {
-            return $this->event->trigger('db.' . $event, $params, $once);
+        if (isset($this->event[$event])) {
+            return call_user_func_array($this->event[$event], [$this]);
         }
     }
 
@@ -296,6 +293,39 @@ class Db
         $query->setDb($this);
 
         return $query;
+    }
+
+    /**
+     * 字符串命名风格转换
+     * type 0 将Java风格转换为C的风格 1 将C风格转换为Java的风格
+     * @access public
+     * @param  string  $name 字符串
+     * @param  integer $type 转换类型
+     * @param  bool    $ucfirst 首字母是否大写（驼峰规则）
+     * @return string
+     */
+    public function parseName(string $name = null, int $type = 0, bool $ucfirst = true): string
+    {
+        if ($type) {
+            $name = preg_replace_callback('/_([a-zA-Z])/', function ($match) {
+                return strtoupper($match[1]);
+            }, $name);
+            return $ucfirst ? ucfirst($name) : lcfirst($name);
+        }
+
+        return strtolower(trim(preg_replace("/[A-Z]/", "_\\0", $name), "_"));
+    }
+
+    /**
+     * 获取类名(不包含命名空间)
+     * @access public
+     * @param string|object $class
+     * @return string
+     */
+    public function classBaseName($class): string
+    {
+        $class = is_object($class) ? get_class($class) : $class;
+        return basename(str_replace('\\', '/', $class));
     }
 
     public function __call($method, $args)

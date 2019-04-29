@@ -12,10 +12,10 @@
 namespace think\model\relation;
 
 use Closure;
-use think\App;
 use think\Collection;
 use think\db\Query;
 use think\Exception;
+use think\facade\Db;
 use think\Model;
 use think\model\Relation;
 
@@ -144,7 +144,7 @@ class MorphMany extends Relation
             $data = $this->eagerlyMorphToMany($where, $relation, $subRelation, $closure);
 
             // 关联属性名
-            $attr = App::parseName($relation);
+            $attr = Db::parseName($relation);
 
             // 关联数据封装
             foreach ($resultSet as $result) {
@@ -192,7 +192,7 @@ class MorphMany extends Relation
                 $relationModel->exists(true);
             }
 
-            $result->setRelation(App::parseName($relation), $this->resultSetBuild($data[$key]));
+            $result->setRelation(Db::parseName($relation), $this->resultSetBuild($data[$key]));
         }
     }
 

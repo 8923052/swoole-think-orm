@@ -12,9 +12,9 @@ declare (strict_types = 1);
 
 namespace think\model\concern;
 
-use think\App;
 use think\Container;
 use think\exception\ModelEventException;
+use think\facade\Db;
 
 /**
  * 模型事件处理
@@ -25,13 +25,19 @@ trait ModelEvent
      * 模型事件观察
      * @var array
      */
-    protected static $observe = ['AfterRead', 'BeforeWrite', 'AfterWrite', 'BeforeInsert', 'AfterInsert', 'BeforeUpdate', 'AfterUpdate', 'BeforeDelete', 'AfterDelete', 'BeforeRestore', 'AfterRestore'];
+    protected $observe = ['AfterRead', 'BeforeWrite', 'AfterWrite', 'BeforeInsert', 'AfterInsert', 'BeforeUpdate', 'AfterUpdate', 'BeforeDelete', 'AfterDelete', 'BeforeRestore', 'AfterRestore'];
 
     /**
      * 模型事件观察者类名
      * @var string
      */
     protected $observerClass;
+
+    /**
+     * Event
+     * @var array
+     */
+    protected $event = [];
 
     /**
      * 是否需要事件响应
@@ -45,15 +51,15 @@ trait ModelEvent
      * @param  string $class 观察者类
      * @return void
      */
-    protected static function observe(string $class): void
+    protected function observe(string $class): void
     {
-        foreach (static::$observe as $event) {
+        foreach ($this->observe as $event) {
             $call = 'on' . $event;
 
             if (method_exists($class, $call)) {
                 $instance = Container::getInstance()->invokeClass($class);
 
-                $this->event->listen(static::class . '.' . $event, [$instance, $call]);
+                $this->event[$event][] = [$instance, $call];
             }
         }
     }
@@ -82,15 +88,18 @@ trait ModelEvent
             return true;
         }
 
-        $call  = 'on' . App::parseName($event, 1, false);
-        $class = static::class;
+        $call   = 'on' . Db::parseName($event, 1);
+        $result = true;
 
         try {
-            if (method_exists($class, $call)) {
-                $result = Container::getInstance()->invoke([$class, $call], [$this]);
-            } else {
-                $result = $this->event->trigger($class . '.' . $event, $this);
-                $result = empty($result) ? true : end($result);
+            if (method_exists(static::class, $call)) {
+                $callback = [static::class, $call];
+            } elseif ($this->observerClass && method_exists($this->observerClass, $call)) {
+                $callback = [$this->observerClass, $call];
+            }
+
+            if (isset($callback)) {
+                $result = Container::getInstance()->invoke($callback, [$this]);
             }
 
             return false === $result ? false : true;

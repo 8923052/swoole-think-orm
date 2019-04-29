@@ -12,8 +12,8 @@ declare (strict_types = 1);
 
 namespace think\db;
 
-use think\App;
 use think\Exception;
+use think\facade\Db;
 
 /**
  * SQL获取类
@@ -470,11 +470,11 @@ class Fetch
     {
         if (strtolower(substr($method, 0, 5)) == 'getby') {
             // 根据某个字段获取记录
-            $field = App::parseName(substr($method, 5));
+            $field = Db::parseName(substr($method, 5));
             return $this->query->where($field, '=', $args[0])->find();
         } elseif (strtolower(substr($method, 0, 10)) == 'getfieldby') {
             // 根据某个字段获取记录的某个值
-            $name = App::parseName(substr($method, 10));
+            $name = Db::parseName(substr($method, 10));
             return $this->query->where($name, '=', $args[0])->value($args[1]);
         }
 

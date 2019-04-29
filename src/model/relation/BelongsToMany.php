@@ -12,11 +12,11 @@
 namespace think\model\relation;
 
 use Closure;
-use think\App;
 use think\Collection;
 use think\db\Query;
 use think\db\Raw;
 use think\Exception;
+use think\facade\Db;
 use think\Model;
 use think\model\Pivot;
 use think\model\Relation;
@@ -69,7 +69,7 @@ class BelongsToMany extends Relation
 
         if (false !== strpos($table, '\\')) {
             $this->pivotName = $table;
-            $this->middle    = App::classBaseName($table);
+            $this->middle    = Db::classBaseName($table);
         } else {
             $this->middle = $table;
         }
@@ -322,7 +322,7 @@ class BelongsToMany extends Relation
             ], $relation, $subRelation, $closure);
 
             // 关联属性名
-            $attr = App::parseName($relation);
+            $attr = Db::parseName($relation);
 
             // 关联数据封装
             foreach ($resultSet as $result) {
@@ -360,7 +360,7 @@ class BelongsToMany extends Relation
                 $data[$pk] = [];
             }
 
-            $result->setRelation(App::parseName($relation), $this->resultSetBuild($data[$pk]));
+            $result->setRelation(Db::parseName($relation), $this->resultSetBuild($data[$pk]));
         }
     }
 

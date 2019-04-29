@@ -15,12 +15,9 @@ namespace think\cache;
 use DateInterval;
 use DateTime;
 use DateTimeInterface;
+use InvalidArgumentException;
 use Psr\Cache\CacheItemInterface;
-use think\exception\InvalidArgumentException;
 
-/**
- * CacheItem实现类
- */
 class CacheItem implements CacheItemInterface
 {
     /**

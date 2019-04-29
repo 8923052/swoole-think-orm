@@ -16,7 +16,6 @@ use PDO;
 use PDOStatement;
 use think\Cache;
 use think\cache\CacheItem;
-use think\Container;
 use think\Db;
 use think\db\exception\BindParamException;
 use think\Exception;
@@ -179,6 +178,8 @@ abstract class Connection
         'break_reconnect' => false,
         // 断线标识字符串
         'break_match_str' => [],
+        // 字段缓存目录
+        'schema_path'     => '',
     ];
 
     /**
@@ -238,19 +239,18 @@ abstract class Connection
     protected $cache;
 
     /**
-     * 日志对象
-     * @var Log
+     * 日志记录
+     * @var array
      */
-    protected $log;
+    protected $log = [];
 
     /**
      * 架构函数 读取数据库配置信息
      * @access public
      * @param Cache $cache 缓存对象
-     * @param Log   $log 日志对象
      * @param array $config 数据库配置数组
      */
-    public function __construct(Cache $cache, Log $log, array $config = [])
+    public function __construct(Cache $cache, array $config = [])
     {
         if (!empty($config)) {
             $this->config = array_merge($this->config, $config);
@@ -261,7 +261,6 @@ abstract class Connection
 
         $this->builder = new $class($this);
         $this->cache   = $cache;
-        $this->log     = $log;
 
         // 执行初始化操作
         $this->initialize();
@@ -300,13 +299,11 @@ abstract class Connection
      * 设置当前的数据库Builder对象
      * @access protected
      * @param Builder $builder
-     * @return $this
+     * @return void
      */
-    protected function setBuilder(Builder $builder)
+    protected function setBuilder(Builder $builder): void
     {
         $this->builder = $builder;
-
-        return $this;
     }
 
     /**
@@ -323,13 +320,11 @@ abstract class Connection
      * 设置当前的数据库Db对象
      * @access public
      * @param Db $db
-     * @return $this
+     * @return void
      */
-    public function setDb(Db $db)
+    public function setDb(Db $db): void
     {
         $this->db = $db;
-
-        return $this;
     }
 
     /**
@@ -446,7 +441,7 @@ abstract class Connection
 
         if (!isset($this->info[$schema])) {
             // 读取缓存
-            $cacheFile = Container::pull('app')->getRuntimePath() . 'schema' . DIRECTORY_SEPARATOR . $schema . '.php';
+            $cacheFile = $this->config['schema_path'] . $schema . '.php';
 
             if (!$this->config['debug'] && is_file($cacheFile)) {
                 $info = include $cacheFile;
@@ -598,7 +593,6 @@ abstract class Connection
 
             if ($config['debug']) {
                 $startTime             = microtime(true);
-
                 //$this->links[$linkNum] = $this->createPdo($config['dsn'], $config['username'], $config['password'], $params);
                 // 记录数据库连接信息
                 $this->log('[ DB ] CONNECT:[ UseTime:' . number_format(microtime(true) - $startTime, 6) . 's ] ' . $config['dsn']);
@@ -616,12 +610,11 @@ abstract class Connection
             	return new \PDO($config['dsn'], $config ['username'], $config ['password'], $params);
             }, $this->config);
             	// 需要注意，初始化和get连接时需要使用同样的config。
-            return \think\swoole\Pool::get($this->config);
-
+            	return \think\swoole\Pool::get($this->config);
             return $this->links[$linkNum];
         } catch (\PDOException $e) {
             if ($autoConnection) {
-                $this->log->error($e->getMessage());
+                $this->log($e->getMessage());
                 return $this->connect($autoConnection, $linkNum);
             } else {
                 throw $e;
@@ -638,20 +631,7 @@ abstract class Connection
      * @return PDO
      */
     protected function createPdo($dsn, $username, $password, $params)
-    {//改动1,从连接池直接获取PDO对象，注意处理连接池，阻塞调用，一直等待拿到为止。
-    	//$this->links[$linkNum] = new PDO($config['dsn'], $config['username'], $config['password'], $params);
-    	// 初始化连接池
-    	\think\swoole\Pool::init(function () use ($dsn, $username, $password, $params) {
-    		//连接池必须用短连接。
-    		$params [\PDO::ATTR_PERSISTENT] = false;
-    		//SQLSTATE[42000]: Syntax error or access violation: 1461 Can't create more than max_prepared_stmt_count statements (current value: 16382)
-    		$params [\PDO::ATTR_EMULATE_PREPARES] = true;
-    		//$params [\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
-    		//return new \PDO($dsn, $config ['username'], $config ['password'], $params);
-    		return new PDO($dsn, $username, $password, $params);
-    	}, $this->config);
-    		// 需要注意，初始化和get连接时需要使用同样的config。
-    		return \think\swoole\Pool::get($this->config);
+    {
         return new PDO($dsn, $username, $password, $params);
     }
 
@@ -691,7 +671,6 @@ abstract class Connection
     public function getCursor(Query $query, string $sql, array $bind = [], $model = null, $condition = null)
     {
         $this->queryPDOStatement($query, $sql, $bind);
-
         // 结束标志
         $end = false;
         // 返回结果集
@@ -703,6 +682,7 @@ abstract class Connection
         		$this->returnConnection();
         		return;
         	}
+        	
             if ($model) {
                 yield $model->newInstance($result, $condition)->setQuery($query);
             } else {
@@ -1183,9 +1163,10 @@ abstract class Connection
      * @param Query  $query   查询对象
      * @param string $field   字段名
      * @param mixed  $default 默认值
+     * @param bool   $one     返回一个值
      * @return mixed
      */
-    public function value(Query $query, string $field, $default = null)
+    public function value(Query $query, string $field, $default = null, bool $one = true)
     {
         $options = $query->parseOptions();
 
@@ -1205,7 +1186,7 @@ abstract class Connection
         }
 
         // 生成查询SQL
-        $sql = $this->builder->select($query, true);
+        $sql = $this->builder->select($query, $one);
 
         if (isset($options['field'])) {
             $query->setOption('field', $options['field']);
@@ -1245,7 +1226,7 @@ abstract class Connection
 
         $field = $aggregate . '(' . (!empty($distinct) ? 'DISTINCT ' : '') . $this->builder->parseKey($query, $field, true) . ') AS tp_' . strtolower($aggregate);
 
-        $result = $this->value($query, $field, 0);
+        $result = $this->value($query, $field, 0, false);
 
         return $force ? (float) $result : $result;
     }
@@ -1464,8 +1445,7 @@ abstract class Connection
         } while ($this->PDOStatement->nextRowset());
 
         $this->numRows = count($item);
-        //归还连接
-        $this->returnConnection();
+
         return $item;
     }
 
@@ -1792,14 +1772,18 @@ abstract class Connection
      * 记录SQL日志
      * @access protected
      * @param string $log  SQL日志信息
-     * @param string $type 日志类型
      * @return void
      */
-    protected function log($log, $type = 'sql'): void
+    protected function log($log): void
     {
         if ($this->config['debug']) {
-            $this->log->record($log, $type);
+            $this->log[] = $log;
         }
+    }
+
+    public function getSqlLog(): array
+    {
+        return $this->log;
     }
 
     /**

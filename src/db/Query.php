@@ -147,18 +147,18 @@ class Query
     {
         if (strtolower(substr($method, 0, 5)) == 'getby') {
             // 根据某个字段获取记录
-            $field = App::parseName(substr($method, 5));
+            $field = $this->db->parseName(substr($method, 5));
             return $this->where($field, '=', $args[0])->find();
         } elseif (strtolower(substr($method, 0, 10)) == 'getfieldby') {
             // 根据某个字段获取记录的某个值
-            $name = App::parseName(substr($method, 10));
+            $name = $this->db->parseName(substr($method, 10));
             return $this->where($name, '=', $args[0])->value($args[1]);
         } elseif (strtolower(substr($method, 0, 7)) == 'whereor') {
-            $name = App::parseName(substr($method, 7));
+            $name = $this->db->parseName(substr($method, 7));
             array_unshift($args, $name);
             return call_user_func_array([$this, 'whereOr'], $args);
         } elseif (strtolower(substr($method, 0, 5)) == 'where') {
-            $name = App::parseName(substr($method, 5));
+            $name = $this->db->parseName(substr($method, 5));
             array_unshift($args, $name);
             return call_user_func_array([$this, 'where'], $args);
         } elseif ($this->model && method_exists($this->model, 'scope' . $method)) {
@@ -288,7 +288,7 @@ class Query
 
         $name = $name ?: $this->name;
 
-        return $this->prefix . App::parseName($name);
+        return $this->prefix . $this->db->parseName($name);
     }
 
     /**
@@ -427,6 +427,16 @@ class Query
     public function getLastSql(): string
     {
         return $this->connection->getLastSql();
+    }
+
+    /**
+     * 获取sql记录
+     * @access public
+     * @return string
+     */
+    public function getSqlLog()
+    {
+        return $this->connection->getSqlLog();
     }
 
     /**
@@ -1479,13 +1489,7 @@ class Query
             $simple = false;
         }
 
-        $defaultConfig = [
-            'query'     => [], //url额外参数
-            'fragment'  => '', //url锚点
-            'var_page'  => 'page', //分页变量
-            'list_rows' => 15, //每页数量
-        ];
-
+        $defaultConfig = $this->getConfig('paginate');
         if (is_array($listRows)) {
             $config   = array_merge($defaultConfig, $listRows);
             $listRows = intval($config['list_rows']);
@@ -1494,11 +1498,15 @@ class Query
             $listRows = intval($listRows ?: $config['list_rows']);
         }
 
-        $page = isset($config['page']) ? (int) $config['page'] : Paginator::getCurrentPage($config['var_page']);
+        $class = false !== strpos($config['type'], '\\') ? $config['type'] : '\\think\\paginator\\driver\\' . ucwords($config['type']);
+        $page  = isset($config['page']) ? (int) $config['page'] : call_user_func([
+            $class,
+            'getCurrentPage',
+        ], $config['var_page']);
 
         $page = $page < 1 ? 1 : $page;
 
-        $config['path'] = $config['path'] ?? Paginator::getCurrentPath();
+        $config['path'] = $config['path'] ?? call_user_func([$class, 'getCurrentPath']);
 
         if (!isset($total) && !$simple) {
             $options = $this->getOptions();
@@ -1518,7 +1526,7 @@ class Query
         $this->removeOption('limit');
         $this->removeOption('page');
 
-        return Paginator::make($results, $listRows, $page, $total, $simple, $config);
+        return $class::make($results, $listRows, $page, $total, $simple, $config);
     }
 
     /**
@@ -1787,10 +1795,10 @@ class Query
     /**
      * 指定distinct查询
      * @access public
-     * @param bool|string $distinct 是否唯一
+     * @param bool $distinct 是否唯一
      * @return $this
      */
-    public function distinct($distinct = true)
+    public function distinct(bool $distinct = true)
     {
         $this->options['distinct'] = $distinct;
         return $this;
@@ -2409,7 +2417,7 @@ class Query
             }
 
             /** @var Relation $model */
-            $relation = App::parseName($relation, 1, false);
+            $relation = $this->db->parseName($relation, 1, false);
             $model    = $class->$relation();
 
             if ($model instanceof OneToOne) {
@@ -2462,7 +2470,7 @@ class Query
             } elseif ($this->model) {
                 // 检测搜索器
                 $fieldName = is_numeric($key) ? $field : $key;
-                $method    = 'search' . App::parseName($fieldName, 1) . 'Attr';
+                $method    = 'search' . $this->db->parseName($fieldName, 1) . 'Attr';
 
                 if (method_exists($this->model, $method)) {
                     $this->model->$method($this, $data[$field] ?? null, $data, $prefix);
@@ -2502,12 +2510,12 @@ class Query
                     $relation       = $key;
                 }
 
-                $relation = App::parseName($relation, 1, false);
+                $relation = $this->db->parseName($relation, 1, false);
 
                 $count = '(' . $this->model->$relation()->getRelationCountQuery($closure, $aggregate, $field, $aggregateField) . ')';
 
                 if (empty($aggregateField)) {
-                    $aggregateField = App::parseName($relation) . '_' . $aggregate;
+                    $aggregateField = $this->db->parseName($relation) . '_' . $aggregate;
                 }
 
                 $this->field([$count => $aggregateField]);
@@ -3034,7 +3042,7 @@ class Query
     protected function getResultAttr(array &$result, array $withAttr = []): void
     {
         foreach ($withAttr as $name => $closure) {
-            $name = App::parseName($name);
+            $name = $this->db->parseName($name);
 
             if (strpos($name, '.')) {
                 // 支持JSON字段 获取器定义
@@ -3457,4 +3465,14 @@ class Query
         return $options;
     }
 
+    public function __debugInfo()
+    {
+        return [
+            'name'    => $this->name,
+            'pk'      => $this->pk,
+            'prefix'  => $this->prefix,
+            'bind'    => $this->bind,
+            'options' => $this->options,
+        ];
+    }
 }

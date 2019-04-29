@@ -12,10 +12,10 @@ declare (strict_types = 1);
 
 namespace think\model\concern;
 
-use think\App;
 use think\Collection;
 use think\db\Query;
 use think\Exception;
+use think\facade\Db;
 use think\Model;
 use think\model\Relation;
 use think\model\relation\BelongsTo;
@@ -107,7 +107,7 @@ trait RelationShip
     public function setRelation(string $name, $value, array $data = [])
     {
         // 检测修改器
-        $method = 'set' . App::parseName($name, 1) . 'Attr';
+        $method = 'set' . Db::parseName($name, 1) . 'Attr';
 
         if (method_exists($this, $method)) {
             $value = $this->$method($value, array_merge($this->data, $data));
@@ -143,7 +143,7 @@ trait RelationShip
                 list($relation, $subRelation) = explode('.', $relation, 2);
             }
 
-            $method = App::parseName($relation, 1, false);
+            $method = Db::parseName($relation, 1, false);
 
             $this->relation[$relation] = $this->$method()->getRelation($subRelation, $closure);
         }
@@ -226,8 +226,8 @@ trait RelationShip
                 $subRelation = [$subRelation];
             }
 
-            $relation     = App::parseName($relation, 1, false);
-            $relationName = App::parseName($relation);
+            $relation     = Db::parseName($relation, 1, false);
+            $relationName = Db::parseName($relation);
 
             $relationResult = $this->$relation();
 
@@ -268,8 +268,8 @@ trait RelationShip
                 $subRelation = [$subRelation];
             }
 
-            $relation     = App::parseName($relation, 1, false);
-            $relationName = App::parseName($relation);
+            $relation     = Db::parseName($relation, 1, false);
+            $relationName = Db::parseName($relation);
 
             $relationResult = $this->$relation();
 
@@ -329,11 +329,11 @@ trait RelationShip
                 $relation = $key;
             }
 
-            $relation = App::parseName($relation, 1, false);
+            $relation = Db::parseName($relation, 1, false);
             $count    = $this->$relation()->relationCount($result, $closure, $aggregate, $field, $name);
 
             if (empty($name)) {
-                $name = App::parseName($relation) . '_' . $aggregate;
+                $name = Db::parseName($relation) . '_' . $aggregate;
             }
 
             $result->setAttr($name, $count);
@@ -373,7 +373,7 @@ trait RelationShip
         $foreignKey = $foreignKey ?: $this->getForeignKey((new $model)->getName());
         $localKey   = $localKey ?: (new $model)->getPk();
         $trace      = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-        $relation   = App::parseName($trace[1]['function']);
+        $relation   = Db::parseName($trace[1]['function']);
 
         return new BelongsTo($this, $model, $foreignKey, $localKey, $relation);
     }
@@ -431,8 +431,8 @@ trait RelationShip
     {
         // 记录当前关联信息
         $model      = $this->parseModel($model);
-        $name       = App::parseName(App::classBaseName($model));
-        $table      = $table ?: App::parseName($this->name) . '_' . $name;
+        $name       = Db::parseName(Db::classBaseName($model));
+        $table      = $table ?: Db::parseName($this->name) . '_' . $name;
         $foreignKey = $foreignKey ?: $name . '_id';
         $localKey   = $localKey ?: $this->getForeignKey($this->name);
 
@@ -454,7 +454,7 @@ trait RelationShip
 
         if (is_null($morph)) {
             $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-            $morph = App::parseName($trace[1]['function']);
+            $morph = Db::parseName($trace[1]['function']);
         }
 
         if (is_array($morph)) {
@@ -484,7 +484,7 @@ trait RelationShip
 
         if (is_null($morph)) {
             $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-            $morph = App::parseName($trace[1]['function']);
+            $morph = Db::parseName($trace[1]['function']);
         }
 
         $type = $type ?: get_class($this);
@@ -509,7 +509,7 @@ trait RelationShip
     public function morphTo($morph = null, array $alias = []): MorphTo
     {
         $trace    = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-        $relation = App::parseName($trace[1]['function']);
+        $relation = Db::parseName($trace[1]['function']);
 
         if (is_null($morph)) {
             $morph = $relation;
@@ -537,7 +537,7 @@ trait RelationShip
         if (false === strpos($model, '\\')) {
             $path = explode('\\', static::class);
             array_pop($path);
-            array_push($path, App::parseName($model, 1));
+            array_push($path, Db::parseName($model, 1));
             $model = implode('\\', $path);
         }
 
@@ -553,10 +553,10 @@ trait RelationShip
     protected function getForeignKey(string $name): string
     {
         if (strpos($name, '\\')) {
-            $name = App::classBaseName($name);
+            $name = Db::classBaseName($name);
         }
 
-        return App::parseName($name) . '_id';
+        return Db::parseName($name) . '_id';
     }
 
     /**
@@ -567,7 +567,7 @@ trait RelationShip
      */
     protected function isRelationAttr(string $attr)
     {
-        $relation = App::parseName($attr, 1, false);
+        $relation = Db::parseName($attr, 1, false);
 
         if (method_exists($this, $relation) && !method_exists('think\Model', $relation)) {
             return $relation;
@@ -579,7 +579,7 @@ trait RelationShip
     /**
      * 智能获取关联模型数据
      * @access protected
-     * @param  Relation  $modelRelation 模型关联对象
+     * @param  Relation $modelRelation 模型关联对象
      * @return mixed
      */
     protected function getRelationData(Relation $modelRelation)
@@ -589,7 +589,7 @@ trait RelationShip
         }
 
         // 获取关联数据
-        return $modelRelation->getModel()->getRelation();
+        return $modelRelation->getRelation();
     }
 
     /**
@@ -650,7 +650,7 @@ trait RelationShip
     protected function autoRelationInsert(): void
     {
         foreach ($this->relationWrite as $name => $val) {
-            $method = App::parseName($name, 1, false);
+            $method = Db::parseName($name, 1, false);
             $this->$method()->save($val);
         }
     }

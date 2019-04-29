@@ -13,9 +13,9 @@ declare (strict_types = 1);
 namespace think\model\relation;
 
 use Closure;
-use think\App;
 use think\Collection;
 use think\db\Query;
+use think\facade\Db;
 use think\Model;
 use think\model\Relation;
 
@@ -100,7 +100,7 @@ class HasMany extends Relation
             $data = $this->eagerlyOneToMany($where, $relation, $subRelation, $closure);
 
             // 关联属性名
-            $attr = App::parseName($relation);
+            $attr = Db::parseName($relation);
 
             // 关联数据封装
             foreach ($resultSet as $result) {
@@ -145,7 +145,7 @@ class HasMany extends Relation
                 $relationModel->setParent(clone $result);
             }
 
-            $result->setRelation(App::parseName($relation), $this->resultSetBuild($data[$pk]));
+            $result->setRelation(Db::parseName($relation), $this->resultSetBuild($data[$pk]));
         }
     }
 
@@ -294,8 +294,8 @@ class HasMany extends Relation
     {
         $table = $this->query->getTable();
 
-        $model    = App::classBaseName($this->parent);
-        $relation = App::classBaseName($this->model);
+        $model    = Db::classBaseName($this->parent);
+        $relation = Db::classBaseName($this->model);
 
         return $this->parent->db()
             ->alias($model)
@@ -316,8 +316,8 @@ class HasMany extends Relation
     public function hasWhere($where = [], $fields = null, string $joinType = ''): Query
     {
         $table    = $this->query->getTable();
-        $model    = App::classBaseName($this->parent);
-        $relation = App::classBaseName($this->model);
+        $model    = Db::classBaseName($this->parent);
+        $relation = Db::classBaseName($this->model);
 
         if (is_array($where)) {
             $this->getQueryWhere($where, $relation);

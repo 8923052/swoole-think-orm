@@ -12,9 +12,9 @@ declare (strict_types = 1);
 
 namespace think\model\concern;
 
-use think\App;
 use think\Collection;
 use think\Exception;
+use think\facade\Db;
 use think\Model;
 use think\model\Collection as ModelCollection;
 use think\model\relation\OneToOne;
@@ -71,7 +71,7 @@ trait Conversion
      */
     public function appendRelationAttr(string $attr, array $append)
     {
-        $relation = App::parseName($attr, 1, false);
+        $relation = Db::parseName($attr, 1, false);
 
         if (isset($this->relation[$relation])) {
             $model = $this->relation[$relation];
