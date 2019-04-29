@@ -15,8 +15,8 @@ namespace think\cache;
 use DateInterval;
 use DateTime;
 use DateTimeInterface;
-use Psr\Cache\CacheItemInterface;
 use InvalidArgumentException;
+use Psr\Cache\CacheItemInterface;
 
 class CacheItem implements CacheItemInterface
 {
@@ -161,7 +161,7 @@ class CacheItem implements CacheItemInterface
         } elseif ($expire instanceof DateTimeInterface) {
             $this->expire = $expire;
         } else {
-            throw new \InvalidArgumentException('not support datetime');
+            throw new InvalidArgumentException('not support datetime');
         }
 
         return $this;
