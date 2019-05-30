@@ -5,8 +5,8 @@ namespace think\swoole;
 use Swoole\Coroutine\Channel;
 
 /**
- *
- * @author : phpprince QQ:8923052
+ * 连接池
+ * @author : prince QQ:8923052
  * @Time: 2019年3月25日 下午12:04:10
  * @version : 1.0.0
  */
@@ -29,6 +29,13 @@ class Pool {
 	 * @var array
 	 */
 	protected static $call_back = [ ];
+	
+	/**
+	 * 记录是否打印日志
+	 *
+	 * @var array
+	 */
+	protected static $log_config = [ ];
 	
 	/**
 	 * RedisPool constructor.
@@ -55,9 +62,10 @@ class Pool {
 				break;
 		}
 		self::$max_size [$id] = $size;
-		self::console("【 初始化 】容量:{$size} {$id}");
+		self::console("【 初始化 】容量:{$size} {$id}", $id);
 		self::$pool [$id] = new Channel($size);
 		self::$call_back [$id] = $callback;
+		self::$log_config [$id] = isset($config ['screen_log']) ? $config ['screen_log'] : false;
 		self::createClient($callback, $config);
 	}
 	
@@ -104,12 +112,12 @@ class Pool {
 				if(isset($connection) && is_object($connection)) {
 					$res = self::put($connection, $config);
 					$res = $res ? '成功' : '失败';
-					self::console("【 初始化 】增加连接{$i} {$res} {$id}");
+					self::console("【 初始化 】增加连接{$i} {$res} {$id}", $id);
 				}
 			} catch (\PDOException | \Exception $e) {
 				//超过服务器支持连接数
 				if(preg_match('/Too many connections/isU', $e->getMessage())) {
-					self::console("【 初始化 】已超过服务器支持连接数,不再创建,当前第{$i}个连接 {$id}");
+					self::console("【 初始化 】已超过服务器支持连接数,不再创建,当前第{$i}个连接 {$id}", $id);
 					return;
 				}
 				self::exception($e);
@@ -150,7 +158,7 @@ class Pool {
 					$res = self::$pool [$id]->push($connection);
 					
 					$length = self::$pool [$id]->length();
-					self::console("【异常补充】增加连接{$i},{$res},当前剩余{$length} {$id}");
+					self::console("【异常补充】增加连接{$i},{$res},当前剩余{$length} {$id}", $id);
 				}
 			} catch (\PDOException | \Exception $e) {
 				if(self::exceptions($e->getMessage())) {
@@ -175,7 +183,7 @@ class Pool {
 		$result = self::$pool [$id]->push($connection, 0.1);
 		
 		$length = self::$pool [$id]->length();
-		self::console("【归还连接】连接{$result},当前剩余{$length} {$id}");
+		self::console("【归还连接】连接{$result},当前剩余{$length} {$id}", $id);
 		return $result;
 	}
 	
@@ -191,21 +199,21 @@ class Pool {
 		}
 		//【暂时禁止默认浮动连接，部分情况导致段错误】检查忙闲状态，适当浮动部分连接
 		if($timeout == 0) {
-// 			$status = self::$pool [$id]->stats();
-// 			if($status ['consumer_num'] / self::$pool [$id]->capacity > 1.5) {
-// 				$timeout = 0.5;
-// 			}
+			// 			$status = self::$pool [$id]->stats();
+			// 			if($status ['consumer_num'] / self::$pool [$id]->capacity > 1.5) {
+			// 				$timeout = 0.5;
+			// 			}
 		}
 		
 		$connection = self::$pool [$id]->pop($timeout);
 		
 		$length = self::$pool [$id]->length();
-		self::console("【获取连接】当前剩余{$length} {$id}");
+		self::console("【获取连接】当前剩余{$length} {$id}", $id);
 		// connection居然可能是NULL
 		if(! $connection) {
 			// 特殊情况下，补充连接
 			if(self::$pool [$id]->isEmpty()) {
-				self::console("【自动补充】{$timeout}内获取连接失败 {$id}");
+				self::console("【自动补充】{$timeout}内获取连接失败 {$id}", $id);
 				self::add($config);
 			}
 			$connection = self::get($config, 0);
@@ -219,12 +227,15 @@ class Pool {
 	 * @param mixed $log
 	 * @return string
 	 */
-	public static function console($log) {
+	public static function console($log, $id = null) {
+		if(is_null($id) or ! self::$log_config [$id]) {
+			return;
+		}
 		if(is_array($log) or is_object($log)) {
 			$log = json_encode($log, JSON_UNESCAPED_UNICODE);
 		}
 		$time = explode(' ', microtime());
-		$time = date('Y-m-d H:i:s') . " {$time ['0']}";
+		$time = date('Y-m-d H:i:s') . " - {$time ['0']}";
 		$cid = \Swoole\Coroutine::getCid();
 		$log = "{$time} [{$cid}] {$log}" . PHP_EOL;
 		echo $log;
