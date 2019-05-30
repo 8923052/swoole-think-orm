@@ -228,7 +228,7 @@ class Pool {
 	 * @return string
 	 */
 	public static function console($log, $id = null) {
-		if(is_null($id) or ! self::$log_config [$id]) {
+		if(! isset(self::$log_config [$id]) or ! self::$log_config [$id]) {
 			return;
 		}
 		if(is_array($log) or is_object($log)) {
