@@ -22,7 +22,7 @@
             "think\\": "src"
         },
         "files": [
-            "src/config.php"
+            
         ]
     }
 }
