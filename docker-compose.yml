@@ -21,7 +21,7 @@ services:
       - "/data:/data"
       - "/data/share/mysql-conf.d:/etc/mysql/conf.d"
   swoole:
-    image: registry.cn-hangzhou.aliyuncs.com/prince/alpine-php:7.3.4-cli-swoole4.3.3
+    image: registry.cn-hangzhou.aliyuncs.com/prince/alpine-php:7.3.7-cli-swoole4.3.5
     container_name: swoole
     hostname: swoole
     network_mode: "host"
