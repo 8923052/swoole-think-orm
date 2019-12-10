@@ -100,6 +100,9 @@ class Db
      */
     public function instance(array $config = [], $name = false)
     {
+    	//直接返回
+    	return $this->factory($config['type'], '\\think\\db\\connector\\', $config);
+    	
         if (false === $name) {
             $name = md5(serialize($config));
         }
@@ -133,7 +136,9 @@ class Db
         $class = false !== strpos($name, '\\') ? $name : $namespace . ucwords($name);
 
         if (class_exists($class)) {
-            return Container::getInstance()->invokeClass($class, $args);
+            //return Container::getInstance()->invokeClass($class, $args);
+            //不使用container单例
+            return (new Container())->invokeClass($class, $args);
         }
 
         throw new Exception('class not exists:' . $class);
