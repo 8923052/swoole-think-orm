@@ -100,6 +100,10 @@ class Db
      */
     public function instance(array $config = [], $name = false)
     {
+    	if (empty($config['type'])) {
+    		throw new InvalidArgumentException('Undefined db type');
+    	}
+    	
     	//直接返回
     	return $this->factory($config['type'], '\\think\\db\\connector\\', $config);
     	
