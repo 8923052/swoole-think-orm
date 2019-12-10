@@ -838,7 +838,8 @@ abstract class Connection
         }
 
         $this->numRows = $this->PDOStatement->rowCount();
-
+        //归还连接
+        $this->returnConnection();
         return $this->numRows;
     }
 
